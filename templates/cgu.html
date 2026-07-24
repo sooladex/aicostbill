@@ -1,0 +1,82 @@
+{% extends "base_legal.html" %}
+{% block title %}Conditions generales d'utilisation - AICostBill{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-8">Conditions generales d'utilisation</h1>
+<p class="text-xs text-gray-400 mb-8">Derniere mise a jour : {{ today }}</p>
+
+<div class="prose prose-sm max-w-none text-gray-700 space-y-6">
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">1. Objet</h2>
+    <p>
+      Les presentes conditions generales d'utilisation (CGU) regissent l'acces et l'utilisation du
+      service AICostBill, une application permettant de suivre les couts d'usage d'API d'intelligence
+      artificielle et de generer des factures pour des clients finaux.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">2. Inscription et compte</h2>
+    <p>
+      L'utilisation du service necessite la creation d'un compte avec une adresse email valide et un
+      mot de passe. L'utilisateur est responsable de la confidentialite de ses identifiants et de
+      toute activite realisee depuis son compte.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">3. Description du service</h2>
+    <p>
+      AICostBill permet notamment : la saisie manuelle ou l'import CSV de couts d'usage d'API IA, la
+      synchronisation automatique des couts via les cles Admin API OpenAI et Anthropic fournies par
+      l'utilisateur, le calcul de marge, et la generation de factures PDF a destination des clients de
+      l'utilisateur.
+    </p>
+    <p>
+      L'utilisateur reste seul responsable de l'exactitude des donnees saisies, des marges appliquees
+      et du contenu des factures generees et envoyees a ses propres clients.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">4. Cles API tierces</h2>
+    <p>
+      Lorsque l'utilisateur connecte une cle Admin API OpenAI ou Anthropic, il garantit disposer du
+      droit de le faire (compte dont il est administrateur ou autorisation de l'administrateur).
+      Ces cles sont chiffrees avant stockage. AICostBill ne peut etre tenu responsable d'une
+      utilisation non autorisee d'une cle fournie par erreur ou sans autorisation.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">5. Abonnement et paiement</h2>
+    <p>
+      Un plan gratuit limite est propose, ainsi qu'un plan payant sans limite de clients, factures via
+      Stripe. Les paiements sont geres par Stripe ; AICostBill ne stocke aucune donnee de carte
+      bancaire. L'abonnement est resiliable a tout moment depuis l'espace de facturation du compte.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">6. Disponibilite et responsabilite</h2>
+    <p>
+      Le service est fourni "en l'etat", en phase de developpement actif. Aucune garantie de
+      disponibilite continue n'est fournie. L'editeur ne pourra etre tenu responsable des consequences
+      directes ou indirectes d'une indisponibilite temporaire, d'une perte de donnees ou d'une erreur
+      de calcul.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">7. Resiliation</h2>
+    <p>
+      L'utilisateur peut cesser d'utiliser le service a tout moment. L'editeur se reserve le droit de
+      suspendre un compte en cas d'usage abusif ou de non-respect des presentes CGU.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">8. Droit applicable</h2>
+    <p>Les presentes CGU sont soumises au droit francais.</p>
+  </section>
+</div>
+{% endblock %}

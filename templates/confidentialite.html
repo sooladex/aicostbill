@@ -1,0 +1,64 @@
+{% extends "base_legal.html" %}
+{% block title %}Politique de confidentialite - AICostBill{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-8">Politique de confidentialite</h1>
+<p class="text-xs text-gray-400 mb-8">Derniere mise a jour : {{ today }}</p>
+
+<div class="prose prose-sm max-w-none text-gray-700 space-y-6">
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">1. Donnees collectees</h2>
+    <p>AICostBill collecte et traite les donnees suivantes :</p>
+    <ul class="list-disc pl-5 space-y-1">
+      <li>Email, mot de passe (chiffre/hache) et nom d'agence lors de l'inscription.</li>
+      <li>Les donnees clients, projets, usages et factures que l'utilisateur saisit lui-meme.</li>
+      <li>Les cles Admin API OpenAI/Anthropic fournies volontairement, chiffrees avant stockage.</li>
+      <li>Les donnees de facturation Stripe (gerees directement par Stripe, non stockees ici).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">2. Finalite du traitement</h2>
+    <p>
+      Ces donnees sont utilisees uniquement pour faire fonctionner le service : afficher le tableau de
+      bord, generer les factures, synchroniser les couts d'usage et gerer l'abonnement. Aucune donnee
+      n'est vendue ni partagee a des fins publicitaires.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">3. Sous-traitants</h2>
+    <ul class="list-disc pl-5 space-y-1">
+      <li><strong>Railway</strong> (hebergement de l'application et de la base de donnees).</li>
+      <li><strong>Stripe</strong> (traitement des paiements d'abonnement).</li>
+      <li><strong>Resend</strong> (envoi des emails de reinitialisation de mot de passe).</li>
+      <li><strong>OpenAI / Anthropic</strong> (uniquement si l'utilisateur connecte ses propres cles
+        Admin API, pour recuperer ses donnees d'usage et de cout).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">4. Duree de conservation</h2>
+    <p>
+      Les donnees sont conservees tant que le compte est actif. En cas de suppression de compte
+      (sur demande a l'email ci-dessous), les donnees sont supprimees dans un delai raisonnable.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">5. Droits des utilisateurs (RGPD)</h2>
+    <p>
+      Conformement au Reglement General sur la Protection des Donnees, tout utilisateur dispose d'un
+      droit d'acces, de rectification, d'effacement et de portabilite de ses donnees. Pour exercer ces
+      droits, contacter : <a href="mailto:adilelasri107@gmail.com" class="text-indigo-600 hover:underline">adilelasri107@gmail.com</a>.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">6. Securite</h2>
+    <p>
+      Les mots de passe sont haches (jamais stockes en clair). Les cles API tierces connectees par
+      l'utilisateur sont chiffrees avant stockage en base. Les connexions au service se font en HTTPS.
+    </p>
+  </section>
+</div>
+{% endblock %}

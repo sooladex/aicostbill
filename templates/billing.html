@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Facturation - AICostBill{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Facturation</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <p class="text-xs uppercase text-gray-400 mb-1">Plan actuel</p>
+    <p class="text-2xl font-semibold mb-4">
+      {% if user.plan == 'pro' %}
+      <span class="text-indigo-600">Pro</span>
+      {% else %}
+      Gratuit
+      {% endif %}
+    </p>
+
+    {% if user.plan == 'pro' %}
+    <p class="text-sm text-gray-500 mb-4">Clients illimites, synchronisation automatique incluse.</p>
+    <form method="post" action="{{ url_for('billing_portal') }}">
+      <button type="submit" class="bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        Gerer mon abonnement
+      </button>
+    </form>
+    {% else %}
+    <p class="text-sm text-gray-500 mb-4">
+      {{ client_count }} / {{ free_limit }} clients utilises sur le plan gratuit.
+    </p>
+    {% if stripe_configured %}
+    <form method="post" action="{{ url_for('billing_checkout') }}">
+      <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+        Passer en Pro &mdash; 19&euro;/mois
+      </button>
+    </form>
+    {% else %}
+    <p class="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg p-3">
+      Le paiement en ligne n'est pas encore active sur ce compte AICostBill (cles Stripe non configurees cote serveur).
+    </p>
+    {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <p class="text-xs uppercase text-gray-400 mb-3">Comparatif</p>
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-400 text-xs uppercase">
+          <th class="pb-2"></th>
+          <th class="pb-2">Gratuit</th>
+          <th class="pb-2">Pro</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="border-t border-gray-100">
+          <td class="py-2 text-gray-600">Clients</td>
+          <td class="py-2">{{ free_limit }} max</td>
+          <td class="py-2">Illimite</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="py-2 text-gray-600">Suivi d'usage &amp; factures PDF</td>
+          <td class="py-2">Inclus</td>
+          <td class="py-2">Inclus</td>
+        </tr>
+        <tr class="border-t border-gray-100">
+          <td class="py-2 text-gray-600">Synchronisation API OpenAI/Anthropic</td>
+          <td class="py-2">Inclus</td>
+          <td class="py-2">Inclus</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
