@@ -23,10 +23,11 @@ def run():
         print("Compte demo deja present, seed ignore.")
         return
 
-    db.execute(
-        "INSERT INTO users (email, password_hash, agency_name, created_at) VALUES (?, ?, ?, ?)",
+    cur = db.execute(
+        "INSERT INTO users (email, password_hash, agency_name, created_at) VALUES (?, ?, ?, ?) RETURNING id",
         (DEMO_EMAIL, generate_password_hash(DEMO_PASSWORD), "Studio Neon (demo)", now()),
     )
+    demo_user_id = cur.fetchone()["id"]
 
     clients_data = [
         ("Boutique Lumen", "contact@lumen-shop.fr", 30),
@@ -36,9 +37,9 @@ def run():
     client_ids = []
     for name, email, markup in clients_data:
         cur = db.execute(
-            "INSERT INTO clients (name, contact_email, default_markup_pct, notes, created_at) "
-            "VALUES (?, ?, ?, ?, ?) RETURNING id",
-            (name, email, markup, "", now()),
+            "INSERT INTO clients (user_id, name, contact_email, default_markup_pct, notes, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+            (demo_user_id, name, email, markup, "", now()),
         )
         client_ids.append(cur.fetchone()["id"])
 

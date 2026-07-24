@@ -29,11 +29,22 @@ def login_required(view):
     return wrapped
 
 
+def current_uid():
+    return session.get("user_id")
+
+
 def get_current_user(db):
     uid = session.get("user_id")
     if not uid:
         return None
     return db.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+
+
+def get_owned_client(db, client_id):
+    """Renvoie le client s'il existe ET appartient a l'utilisateur connecte, sinon None."""
+    return db.execute(
+        "SELECT * FROM clients WHERE id = ? AND user_id = ?", (client_id, current_uid())
+    ).fetchone()
 
 
 @app.before_request
@@ -50,39 +61,53 @@ def close_db(exc):
 
 # ---------- auth ----------
 
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    db = g.db
+    if request.method == "POST":
+        agency_name = request.form.get("agency_name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if not email or not password:
+            flash("Email et mot de passe requis.", "error")
+            return redirect(url_for("signup"))
+
+        existing = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+        if existing:
+            flash("Un compte existe deja avec cet email. Connecte-toi plutot.", "error")
+            return redirect(url_for("login"))
+
+        cur = db.execute(
+            "INSERT INTO users (email, password_hash, agency_name, created_at) VALUES (?, ?, ?, ?) RETURNING id",
+            (email, generate_password_hash(password), agency_name or "Mon agence", now()),
+        )
+        user_id = cur.fetchone()["id"]
+        db.commit()
+
+        session["user_id"] = user_id
+        flash("Compte cree avec succes. Bienvenue !", "success")
+        return redirect(url_for("dashboard"))
+
+    return render_template("signup.html")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     db = g.db
-    has_user = db.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] > 0
 
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
-        agency_name = request.form.get("agency_name", "").strip()
 
-        if not has_user:
-            # premier lancement : on cree le compte admin
-            if not email or not password:
-                flash("Email et mot de passe requis.", "error")
-                return redirect(url_for("login"))
-            db.execute(
-                "INSERT INTO users (email, password_hash, agency_name, created_at) VALUES (?, ?, ?, ?)",
-                (email, generate_password_hash(password), agency_name or "Mon agence", now()),
-            )
-            db.commit()
-            user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if user and check_password_hash(user["password_hash"], password):
             session["user_id"] = user["id"]
-            flash("Compte cree avec succes. Bienvenue !", "success")
-            return redirect(url_for("dashboard"))
-        else:
-            user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
-            if user and check_password_hash(user["password_hash"], password):
-                session["user_id"] = user["id"]
-                return redirect(request.args.get("next") or url_for("dashboard"))
-            flash("Identifiants incorrects.", "error")
-            return redirect(url_for("login"))
+            return redirect(request.args.get("next") or url_for("dashboard"))
+        flash("Identifiants incorrects.", "error")
+        return redirect(url_for("login"))
 
-    return render_template("login.html", has_user=has_user)
+    return render_template("login.html")
 
 
 @app.route("/logout")
@@ -106,16 +131,33 @@ def landing():
 @login_required
 def dashboard():
     db = g.db
-    clients = db.execute("SELECT * FROM clients ORDER BY name").fetchall()
+    uid = current_uid()
+    clients = db.execute("SELECT * FROM clients WHERE user_id = ? ORDER BY name", (uid,)).fetchall()
 
-    total_cost = db.execute("SELECT COALESCE(SUM(cost_usd),0) AS s FROM usage_entries").fetchone()["s"]
-    total_billed = db.execute("SELECT COALESCE(SUM(total_billed),0) AS s FROM invoices").fetchone()["s"]
-    total_invoiced_cost = db.execute(
-        "SELECT COALESCE(SUM(subtotal_cost),0) AS s FROM invoices"
-    ).fetchone()["s"]
-    uninvoiced_cost = db.execute(
-        "SELECT COALESCE(SUM(cost_usd),0) AS s FROM usage_entries WHERE invoice_id IS NULL"
-    ).fetchone()["s"]
+    total_cost = db.execute("""
+        SELECT COALESCE(SUM(u.cost_usd),0) AS s FROM usage_entries u
+        JOIN projects p ON p.id = u.project_id
+        JOIN clients c ON c.id = p.client_id
+        WHERE c.user_id = ?
+    """, (uid,)).fetchone()["s"]
+
+    total_billed = db.execute("""
+        SELECT COALESCE(SUM(i.total_billed),0) AS s FROM invoices i
+        JOIN clients c ON c.id = i.client_id WHERE c.user_id = ?
+    """, (uid,)).fetchone()["s"]
+
+    total_invoiced_cost = db.execute("""
+        SELECT COALESCE(SUM(i.subtotal_cost),0) AS s FROM invoices i
+        JOIN clients c ON c.id = i.client_id WHERE c.user_id = ?
+    """, (uid,)).fetchone()["s"]
+
+    uninvoiced_cost = db.execute("""
+        SELECT COALESCE(SUM(u.cost_usd),0) AS s FROM usage_entries u
+        JOIN projects p ON p.id = u.project_id
+        JOIN clients c ON c.id = p.client_id
+        WHERE c.user_id = ? AND u.invoice_id IS NULL
+    """, (uid,)).fetchone()["s"]
+
     margin = total_billed - total_invoiced_cost
 
     per_client = db.execute("""
@@ -125,18 +167,20 @@ def dashboard():
         FROM clients c
         LEFT JOIN projects p ON p.client_id = c.id
         LEFT JOIN usage_entries u ON u.project_id = p.id
+        WHERE c.user_id = ?
         GROUP BY c.id
         ORDER BY total_cost DESC
-    """).fetchall()
+    """, (uid,)).fetchall()
 
     recent_entries = db.execute("""
         SELECT u.*, p.name AS project_name, c.name AS client_name
         FROM usage_entries u
         JOIN projects p ON p.id = u.project_id
         JOIN clients c ON c.id = p.client_id
+        WHERE c.user_id = ?
         ORDER BY u.entry_date DESC, u.id DESC
         LIMIT 8
-    """).fetchall()
+    """, (uid,)).fetchall()
 
     return render_template(
         "dashboard.html",
@@ -156,6 +200,7 @@ def dashboard():
 @login_required
 def clients():
     db = g.db
+    uid = current_uid()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         email = request.form.get("contact_email", "").strip()
@@ -163,15 +208,15 @@ def clients():
         notes = request.form.get("notes", "").strip()
         if name:
             db.execute(
-                "INSERT INTO clients (name, contact_email, default_markup_pct, notes, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (name, email, markup, notes, now()),
+                "INSERT INTO clients (user_id, name, contact_email, default_markup_pct, notes, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (uid, name, email, markup, notes, now()),
             )
             db.commit()
             flash(f"Client '{name}' cree.", "success")
         return redirect(url_for("clients"))
 
-    all_clients = db.execute("SELECT * FROM clients ORDER BY name").fetchall()
+    all_clients = db.execute("SELECT * FROM clients WHERE user_id = ? ORDER BY name", (uid,)).fetchall()
     return render_template("clients.html", clients=all_clients)
 
 
@@ -179,7 +224,7 @@ def clients():
 @login_required
 def client_detail(client_id):
     db = g.db
-    client = db.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
+    client = get_owned_client(db, client_id)
     if not client:
         flash("Client introuvable.", "error")
         return redirect(url_for("clients"))
@@ -246,6 +291,7 @@ def client_detail(client_id):
 @login_required
 def usage():
     db = g.db
+    uid = current_uid()
     if request.method == "POST":
         project_id = request.form.get("project_id")
         entry_date = request.form.get("entry_date") or date.today().isoformat()
@@ -259,7 +305,12 @@ def usage():
             flash("Cout invalide.", "error")
             return redirect(url_for("usage"))
 
-        if project_id:
+        owns_project = db.execute("""
+            SELECT p.id FROM projects p JOIN clients c ON c.id = p.client_id
+            WHERE p.id = ? AND c.user_id = ?
+        """, (project_id, uid)).fetchone()
+
+        if project_id and owns_project:
             db.execute(
                 """INSERT INTO usage_entries
                    (project_id, entry_date, provider, model, description, cost_usd, created_at)
@@ -268,22 +319,26 @@ def usage():
             )
             db.commit()
             flash("Usage enregistre.", "success")
+        else:
+            flash("Projet invalide.", "error")
         return redirect(url_for("usage"))
 
     projects = db.execute("""
         SELECT p.id, p.name, c.name AS client_name
         FROM projects p JOIN clients c ON c.id = p.client_id
+        WHERE c.user_id = ?
         ORDER BY c.name, p.name
-    """).fetchall()
+    """, (uid,)).fetchall()
 
     recent = db.execute("""
         SELECT u.*, p.name AS project_name, c.name AS client_name
         FROM usage_entries u
         JOIN projects p ON p.id = u.project_id
         JOIN clients c ON c.id = p.client_id
+        WHERE c.user_id = ?
         ORDER BY u.entry_date DESC, u.id DESC
         LIMIT 50
-    """).fetchall()
+    """, (uid,)).fetchall()
 
     return render_template("usage.html", projects=projects, entries=recent, providers=PROVIDERS)
 
@@ -292,16 +347,26 @@ def usage():
 @login_required
 def usage_import():
     db = g.db
+    uid = current_uid()
     file = request.files.get("csv_file")
     if not file:
         flash("Aucun fichier fourni.", "error")
         return redirect(url_for("usage"))
+
+    owned_project_ids = {
+        str(r["id"]) for r in db.execute("""
+            SELECT p.id FROM projects p JOIN clients c ON c.id = p.client_id
+            WHERE c.user_id = ?
+        """, (uid,)).fetchall()
+    }
 
     stream = io.StringIO(file.stream.read().decode("utf-8"))
     reader = csv.DictReader(stream)
     # colonnes attendues : project_id, entry_date, provider, model, description, cost_usd
     count = 0
     for row in reader:
+        if row.get("project_id") not in owned_project_ids:
+            continue
         try:
             db.execute(
                 """INSERT INTO usage_entries
@@ -327,6 +392,7 @@ def usage_import():
 @login_required
 def invoices():
     db = g.db
+    uid = current_uid()
 
     if request.method == "POST":
         client_id = request.form.get("client_id")
@@ -334,7 +400,7 @@ def invoices():
         period_end = request.form.get("period_end")
         markup_pct = request.form.get("markup_pct")
 
-        client = db.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
+        client = get_owned_client(db, client_id)
         if not client:
             flash("Client invalide.", "error")
             return redirect(url_for("invoices"))
@@ -371,21 +437,30 @@ def invoices():
         flash(f"Facture INV-{invoice_id:05d} generee : {total_billed:.2f} USD.", "success")
         return redirect(url_for("invoice_detail", invoice_id=invoice_id))
 
-    all_clients = db.execute("SELECT * FROM clients ORDER BY name").fetchall()
+    all_clients = db.execute("SELECT * FROM clients WHERE user_id = ? ORDER BY name", (uid,)).fetchall()
     all_invoices = db.execute("""
         SELECT i.*, c.name AS client_name FROM invoices i
         JOIN clients c ON c.id = i.client_id
+        WHERE c.user_id = ?
         ORDER BY i.created_at DESC
-    """).fetchall()
+    """, (uid,)).fetchall()
 
     return render_template("invoices.html", clients=all_clients, invoices=all_invoices, today=date.today().isoformat())
+
+
+def get_owned_invoice(db, invoice_id):
+    return db.execute("""
+        SELECT i.* FROM invoices i
+        JOIN clients c ON c.id = i.client_id
+        WHERE i.id = ? AND c.user_id = ?
+    """, (invoice_id, current_uid())).fetchone()
 
 
 @app.route("/invoices/<int:invoice_id>")
 @login_required
 def invoice_detail(invoice_id):
     db = g.db
-    invoice = db.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    invoice = get_owned_invoice(db, invoice_id)
     if not invoice:
         flash("Facture introuvable.", "error")
         return redirect(url_for("invoices"))
@@ -404,7 +479,7 @@ def invoice_detail(invoice_id):
 def invoice_pdf_download(invoice_id):
     from invoice_pdf import build_invoice_pdf
     db = g.db
-    invoice = db.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+    invoice = get_owned_invoice(db, invoice_id)
     if not invoice:
         flash("Facture introuvable.", "error")
         return redirect(url_for("invoices"))
