@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS clients (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     contact_email TEXT,
     default_markup_pct REAL NOT NULL DEFAULT 30,
@@ -95,9 +95,20 @@ CREATE TABLE IF NOT EXISTS usage_entries (
 """
 
 
+# Migration : les deploiements d'avant le multi-compte ont une table clients
+# sans user_id. On l'ajoute si besoin et on rattache les clients orphelins
+# au premier compte existant, sans rien supprimer.
+MIGRATION = """
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
+UPDATE clients SET user_id = (SELECT id FROM users ORDER BY id LIMIT 1)
+WHERE user_id IS NULL AND EXISTS (SELECT 1 FROM users);
+"""
+
+
 def init_db():
     conn = get_db()
     conn.executescript(SCHEMA)
+    conn.executescript(MIGRATION)
     conn.close()
 
 
