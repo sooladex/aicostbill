@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Connexions API - AICostBill{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-2">Connexions API</h1>
+<p class="text-sm text-gray-500 mb-6">
+  Connecte les cles <strong>Admin API</strong> d'OpenAI et Anthropic (differentes des cles API classiques)
+  pour recuperer automatiquement les couts reels, au lieu de les saisir a la main.
+</p>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Cles connectees</h2>
+    {% if creds %}
+    <ul class="space-y-3">
+      {% for c in creds %}
+      <li class="flex items-center justify-between border-b border-gray-100 pb-3">
+        <div>
+          <p class="text-sm font-medium capitalize">{{ c.provider }}</p>
+          <p class="text-xs text-gray-400">
+            {{ c.label }}
+            {% if c.last_synced_at %} &middot; derniere sync {{ c.last_synced_at[:16].replace('T',' ') }}{% endif %}
+          </p>
+          {% if c.last_sync_error %}
+          <p class="text-xs text-red-600 mt-1">{{ c.last_sync_error }}</p>
+          {% endif %}
+        </div>
+        <form method="post" action="{{ url_for('settings_delete', provider=c.provider) }}">
+          <button type="submit" class="text-xs text-gray-400 hover:text-red-600">Supprimer</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-gray-400">Aucune cle connectee pour le moment.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Ajouter / mettre a jour une cle</h2>
+    <form method="post" class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Fournisseur</label>
+        <select name="provider" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          {% for p in sync_providers %}
+          <option value="{{ p }}">{{ p }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Cle Admin API</label>
+        <input name="api_key" type="password" required placeholder="sk-admin-..."
+               class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+      </div>
+      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-lg transition">
+        Enregistrer (chiffree)
+      </button>
+    </form>
+    <p class="text-xs text-gray-400 mt-3">
+      La cle est chiffree avant d'etre stockee et n'est jamais affichee en clair.
+    </p>
+  </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+  <h2 class="text-sm font-semibold text-gray-700 mb-2">Liaisons client &rarr; project/workspace</h2>
+  <p class="text-xs text-gray-500 mb-4">
+    Pour que la synchronisation sache quel cout appartient a quel client, chaque client doit etre relie
+    au <em>project</em> OpenAI ou au <em>workspace</em> Anthropic correspondant (fait depuis la fiche de chaque client).
+  </p>
+  {% if links %}
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-gray-400 text-xs uppercase">
+        <th class="pb-2">Client</th>
+        <th class="pb-2">Fournisseur</th>
+        <th class="pb-2">ID externe</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in links %}
+      <tr class="border-t border-gray-100">
+        <td class="py-2"><a href="{{ url_for('client_detail', client_id=l.client_id) }}" class="text-indigo-600 hover:underline">{{ l.client_name }}</a></td>
+        <td class="py-2 capitalize">{{ l.provider }}</td>
+        <td class="py-2 text-gray-500">{{ l.external_id }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-sm text-gray-400">Aucune liaison pour le moment.</p>
+  {% endif %}
+</div>
+{% endblock %}

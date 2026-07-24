@@ -23,6 +23,7 @@
       <a href="{{ url_for('clients') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint in ['clients','client_detail'] }}">Clients</a>
       <a href="{{ url_for('usage') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint == 'usage' }}">Usage IA</a>
       <a href="{{ url_for('invoices') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint in ['invoices','invoice_detail'] }}">Factures</a>
+      <a href="{{ url_for('settings') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint == 'settings' }}">Connexions API</a>
     </nav>
     <div class="px-3 py-4 border-t border-gray-800">
       <a href="{{ url_for('logout') }}" class="block px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white text-sm">Se deconnecter</a>
