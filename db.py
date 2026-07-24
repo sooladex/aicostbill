@@ -133,6 +133,19 @@ WHERE user_id IS NULL AND EXISTS (SELECT 1 FROM users);
 
 ALTER TABLE usage_entries ADD COLUMN IF NOT EXISTS sync_key TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS usage_entries_sync_key_idx ON usage_entries(sync_key) WHERE sync_key IS NOT NULL;
+
+-- Recuperation de mot de passe : token a usage unique + expiration.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_reset_token_idx ON users(reset_token) WHERE reset_token IS NOT NULL;
+
+-- Abonnement Stripe : un compte est soit "free" (plan gratuit limite),
+-- soit "pro" (paye, illimite). Les champs stripe_* sont remplis par le
+-- webhook Stripe au fil des evenements d'abonnement.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan TEXT NOT NULL DEFAULT 'free';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_current_period_end TEXT;
 """
 
 

@@ -1,9 +1,11 @@
 import os
 import csv
 import io
+import secrets
 from functools import wraps
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
+import stripe
 from flask import (
     Flask, render_template, request, redirect, url_for, session,
     flash, send_file, g
@@ -13,12 +15,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import get_db, init_db, now
 import crypto
 from provider_sync import FETCHERS, ProviderSyncError
+from emailer import send_password_reset_email, EmailError
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me-in-prod")
 
 PROVIDERS = ["OpenAI", "Anthropic", "Google", "Mistral", "Autre"]
 SYNC_PROVIDERS = ["openai", "anthropic"]
+
+FREE_PLAN_CLIENT_LIMIT = 2
+STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+
+
+def is_pro(user):
+    return bool(user and user.get("plan") == "pro")
 
 
 # ---------- helpers ----------
@@ -119,6 +130,66 @@ def logout():
     return redirect(url_for("login"))
 
 
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    db = g.db
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        if user:
+            token = secrets.token_urlsafe(32)
+            expires = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+            db.execute(
+                "UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?",
+                (token, expires, user["id"]),
+            )
+            db.commit()
+            reset_url = url_for("reset_password", token=token, _external=True)
+            try:
+                send_password_reset_email(email, reset_url)
+            except EmailError as e:
+                app.logger.error(f"Envoi email de reinitialisation echoue pour {email}: {e}")
+
+        # Meme message que le compte existe ou non, pour ne pas reveler
+        # quels emails sont inscrits (anti-enumeration).
+        flash(
+            "Si un compte existe avec cet email, un lien de reinitialisation vient d'etre envoye.",
+            "success",
+        )
+        return redirect(url_for("login"))
+
+    return render_template("forgot_password.html")
+
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    db = g.db
+    user = db.execute(
+        "SELECT * FROM users WHERE reset_token = ? AND reset_token_expires > ?",
+        (token, datetime.utcnow().isoformat()),
+    ).fetchone()
+
+    if not user:
+        flash("Ce lien de reinitialisation est invalide ou a expire.", "error")
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if len(password) < 6:
+            flash("Le mot de passe doit faire au moins 6 caracteres.", "error")
+            return redirect(url_for("reset_password", token=token))
+
+        db.execute(
+            "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?",
+            (generate_password_hash(password), user["id"]),
+        )
+        db.commit()
+        flash("Mot de passe mis a jour. Tu peux te connecter.", "success")
+        return redirect(url_for("login"))
+
+    return render_template("reset_password.html", token=token)
+
+
 # ---------- landing page ----------
 
 @app.route("/")
@@ -126,6 +197,21 @@ def landing():
     if session.get("user_id"):
         return redirect(url_for("dashboard"))
     return render_template("landing.html")
+
+
+@app.route("/mentions-legales")
+def mentions_legales():
+    return render_template("mentions_legales.html")
+
+
+@app.route("/cgu")
+def cgu():
+    return render_template("cgu.html", today=date.today().isoformat())
+
+
+@app.route("/confidentialite")
+def confidentialite():
+    return render_template("confidentialite.html", today=date.today().isoformat())
 
 
 # ---------- dashboard ----------
@@ -205,6 +291,18 @@ def clients():
     db = g.db
     uid = current_uid()
     if request.method == "POST":
+        user = get_current_user(db)
+        client_count = db.execute(
+            "SELECT COUNT(*) AS c FROM clients WHERE user_id = ?", (uid,)
+        ).fetchone()["c"]
+        if not is_pro(user) and client_count >= FREE_PLAN_CLIENT_LIMIT:
+            flash(
+                f"Le plan gratuit est limite a {FREE_PLAN_CLIENT_LIMIT} clients. "
+                "Passe en Pro pour en ajouter davantage.",
+                "error",
+            )
+            return redirect(url_for("billing"))
+
         name = request.form.get("name", "").strip()
         email = request.form.get("contact_email", "").strip()
         markup = float(request.form.get("default_markup_pct") or 30)
@@ -693,6 +791,132 @@ def usage_sync():
         )
 
     return redirect(url_for("usage"))
+
+
+# ---------- facturation / abonnement Stripe ----------
+
+@app.route("/billing")
+@login_required
+def billing():
+    db = g.db
+    user = get_current_user(db)
+    client_count = db.execute(
+        "SELECT COUNT(*) AS c FROM clients WHERE user_id = ?", (current_uid(),)
+    ).fetchone()["c"]
+    return render_template(
+        "billing.html",
+        user=user,
+        client_count=client_count,
+        free_limit=FREE_PLAN_CLIENT_LIMIT,
+        stripe_configured=bool(stripe.api_key and STRIPE_PRICE_ID),
+    )
+
+
+@app.route("/billing/checkout", methods=["POST"])
+@login_required
+def billing_checkout():
+    db = g.db
+    user = get_current_user(db)
+
+    if not stripe.api_key or not STRIPE_PRICE_ID:
+        flash("Le paiement n'est pas encore configure (cles Stripe manquantes).", "error")
+        return redirect(url_for("billing"))
+
+    try:
+        customer_id = user["stripe_customer_id"]
+        if not customer_id:
+            customer = stripe.Customer.create(email=user["email"], name=user["agency_name"])
+            customer_id = customer["id"]
+            db.execute(
+                "UPDATE users SET stripe_customer_id = ? WHERE id = ?",
+                (customer_id, user["id"]),
+            )
+            db.commit()
+
+        checkout_session = stripe.checkout.Session.create(
+            customer=customer_id,
+            mode="subscription",
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            success_url=url_for("billing", _external=True) + "?checkout=success",
+            cancel_url=url_for("billing", _external=True) + "?checkout=cancelled",
+            client_reference_id=str(user["id"]),
+        )
+        return redirect(checkout_session.url, code=303)
+    except Exception as e:
+        flash(f"Erreur Stripe : {e}", "error")
+        return redirect(url_for("billing"))
+
+
+@app.route("/billing/portal", methods=["POST"])
+@login_required
+def billing_portal():
+    db = g.db
+    user = get_current_user(db)
+
+    if not user["stripe_customer_id"]:
+        flash("Aucun abonnement Stripe associe a ce compte.", "error")
+        return redirect(url_for("billing"))
+
+    try:
+        portal_session = stripe.billing_portal.Session.create(
+            customer=user["stripe_customer_id"],
+            return_url=url_for("billing", _external=True),
+        )
+        return redirect(portal_session.url, code=303)
+    except Exception as e:
+        flash(f"Erreur Stripe : {e}", "error")
+        return redirect(url_for("billing"))
+
+
+@app.route("/webhooks/stripe", methods=["POST"])
+def stripe_webhook():
+    db = g.db
+    payload = request.data
+    sig_header = request.headers.get("Stripe-Signature")
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET")
+
+    try:
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+            event_type = event["type"]
+            data_object = event["data"]["object"]
+        else:
+            # Pas de secret configure (ex: tests locaux) : on fait confiance
+            # au payload recu. A NE JAMAIS FAIRE EN PRODUCTION reelle : mettre
+            # STRIPE_WEBHOOK_SECRET des que l'endpoint est enregistre chez Stripe.
+            event = request.get_json(force=True)
+            event_type = event["type"]
+            data_object = event["data"]["object"]
+    except (ValueError, stripe.error.SignatureVerificationError) as e:
+        return {"error": str(e)}, 400
+
+    if event_type == "checkout.session.completed":
+        user_id = data_object.get("client_reference_id")
+        customer_id = data_object.get("customer")
+        subscription_id = data_object.get("subscription")
+        if user_id:
+            db.execute(
+                "UPDATE users SET plan = 'pro', stripe_customer_id = ?, stripe_subscription_id = ? WHERE id = ?",
+                (customer_id, subscription_id, user_id),
+            )
+            db.commit()
+
+    elif event_type in ("customer.subscription.updated", "customer.subscription.deleted"):
+        customer_id = data_object.get("customer")
+        status = data_object.get("status")
+        current_period_end = data_object.get("current_period_end")
+        plan = "pro" if status in ("active", "trialing") else "free"
+        period_end_iso = (
+            datetime.utcfromtimestamp(current_period_end).isoformat()
+            if current_period_end else None
+        )
+        db.execute(
+            "UPDATE users SET plan = ?, plan_current_period_end = ? WHERE stripe_customer_id = ?",
+            (plan, period_end_iso, customer_id),
+        )
+        db.commit()
+
+    return {"received": True}, 200
 
 
 if __name__ == "__main__":
