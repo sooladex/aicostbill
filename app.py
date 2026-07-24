@@ -349,10 +349,10 @@ def invoices():
         cur = db.execute(
             """INSERT INTO invoices
                (client_id, period_start, period_end, subtotal_cost, markup_pct, total_billed, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, 'draft', ?) RETURNING id""",
             (client_id, period_start, period_end, subtotal, markup_pct, total_billed, now()),
         )
-        invoice_id = cur.lastrowid
+        invoice_id = cur.fetchone()["id"]
 
         ids = [r["id"] for r in rows]
         qmarks = ",".join("?" * len(ids))

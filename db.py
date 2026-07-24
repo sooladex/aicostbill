@@ -1,20 +1,51 @@
-import sqlite3
 import os
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "aicostbill.db")
+import psycopg2
+import psycopg2.extras
+
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+
+class PGConnection:
+    """
+    Petit adaptateur autour de psycopg2 qui imite l'API pratique de
+    sqlite3.Connection (conn.execute(sql, params) -> curseur avec
+    fetchone()/fetchall(), lignes accessibles comme des dicts).
+    Permet de garder le reste de l'appli quasi inchange.
+    """
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql, params=()):
+        sql_pg = sql.replace("?", "%s")
+        cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(sql_pg, params)
+        return cur
+
+    def executescript(self, script):
+        cur = self._conn.cursor()
+        cur.execute(script)
+        self._conn.commit()
+        cur.close()
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    conn = psycopg2.connect(DATABASE_URL)
+    return PGConnection(conn)
 
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     agency_name TEXT NOT NULL DEFAULT 'Mon agence',
@@ -22,7 +53,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS clients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     contact_email TEXT,
     default_markup_pct REAL NOT NULL DEFAULT 30,
@@ -31,26 +62,14 @@ CREATE TABLE IF NOT EXISTS clients (
 );
 
 CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS usage_entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    entry_date TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    model TEXT,
-    description TEXT,
-    cost_usd REAL NOT NULL,
-    invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
-    created_at TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS invoices (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
     period_start TEXT NOT NULL,
     period_end TEXT NOT NULL,
@@ -60,13 +79,24 @@ CREATE TABLE IF NOT EXISTS invoices (
     status TEXT NOT NULL DEFAULT 'draft',
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS usage_entries (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    entry_date TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT,
+    description TEXT,
+    cost_usd REAL NOT NULL,
+    invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL
+);
 """
 
 
 def init_db():
     conn = get_db()
     conn.executescript(SCHEMA)
-    conn.commit()
     conn.close()
 
 
@@ -76,4 +106,4 @@ def now():
 
 if __name__ == "__main__":
     init_db()
-    print(f"Base initialisee : {DB_PATH}")
+    print("Base Postgres initialisee.")

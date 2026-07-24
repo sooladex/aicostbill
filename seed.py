@@ -36,10 +36,11 @@ def run():
     client_ids = []
     for name, email, markup in clients_data:
         cur = db.execute(
-            "INSERT INTO clients (name, contact_email, default_markup_pct, notes, created_at) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO clients (name, contact_email, default_markup_pct, notes, created_at) "
+            "VALUES (?, ?, ?, ?, ?) RETURNING id",
             (name, email, markup, "", now()),
         )
-        client_ids.append(cur.lastrowid)
+        client_ids.append(cur.fetchone()["id"])
 
     projects_data = {
         client_ids[0]: ["Chatbot support client", "Generation de descriptions produits"],
@@ -51,10 +52,10 @@ def run():
         project_ids[client_id] = []
         for n in names:
             cur = db.execute(
-                "INSERT INTO projects (client_id, name, created_at) VALUES (?, ?, ?)",
+                "INSERT INTO projects (client_id, name, created_at) VALUES (?, ?, ?) RETURNING id",
                 (client_id, n, now()),
             )
-            project_ids[client_id].append(cur.lastrowid)
+            project_ids[client_id].append(cur.fetchone()["id"])
 
     providers_models = [
         ("OpenAI", "gpt-4o"),
