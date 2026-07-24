@@ -11,11 +11,14 @@ from flask import (
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import get_db, init_db, now
+import crypto
+from provider_sync import FETCHERS, ProviderSyncError
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me-in-prod")
 
 PROVIDERS = ["OpenAI", "Anthropic", "Google", "Mistral", "Autre"]
+SYNC_PROVIDERS = ["openai", "anthropic"]
 
 
 # ---------- helpers ----------
@@ -245,11 +248,38 @@ def client_detail(client_id):
             db.execute("UPDATE clients SET default_markup_pct = ? WHERE id = ?", (markup, client_id))
             db.commit()
             flash("Marge par defaut mise a jour.", "success")
+        elif form == "link_provider":
+            provider = request.form.get("provider")
+            external_id = request.form.get("external_id", "").strip()
+            if provider in SYNC_PROVIDERS and external_id:
+                db.execute("""
+                    INSERT INTO client_provider_links (client_id, provider, external_id, created_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT (client_id, provider) DO UPDATE SET external_id = EXCLUDED.external_id
+                """, (client_id, provider, external_id, now()))
+                db.commit()
+                flash("Liaison enregistree. Lance une synchronisation depuis la page Usage IA.", "success")
+        elif form == "unlink_provider":
+            provider = request.form.get("provider")
+            db.execute(
+                "DELETE FROM client_provider_links WHERE client_id = ? AND provider = ?",
+                (client_id, provider),
+            )
+            db.commit()
+            flash("Liaison supprimee.", "success")
         return redirect(url_for("client_detail", client_id=client_id))
 
     projects = db.execute(
         "SELECT * FROM projects WHERE client_id = ? ORDER BY name", (client_id,)
     ).fetchall()
+
+    provider_links = {
+        r["provider"]: r["external_id"]
+        for r in db.execute(
+            "SELECT provider, external_id FROM client_provider_links WHERE client_id = ?",
+            (client_id,),
+        ).fetchall()
+    }
 
     project_ids = [p["id"] for p in projects]
     entries = []
@@ -282,6 +312,7 @@ def client_detail(client_id):
         "client_detail.html",
         client=client, projects=projects, entries=entries,
         total_cost=total_cost, uninvoiced_cost=uninvoiced_cost, invoices=invoices,
+        provider_links=provider_links,
     )
 
 
@@ -501,6 +532,167 @@ def invoice_pdf_download(invoice_id):
         as_attachment=True,
         download_name=f"facture-INV-{invoice_id:05d}.pdf",
     )
+
+
+def get_or_create_sync_project(db, client_id):
+    p = db.execute(
+        "SELECT id FROM projects WHERE client_id = ? AND name = ?",
+        (client_id, "Synchronisation automatique"),
+    ).fetchone()
+    if p:
+        return p["id"]
+    cur = db.execute(
+        "INSERT INTO projects (client_id, name, created_at) VALUES (?, ?, ?) RETURNING id",
+        (client_id, "Synchronisation automatique", now()),
+    )
+    return cur.fetchone()["id"]
+
+
+# ---------- parametres / connexions API ----------
+
+@app.route("/settings", methods=["GET", "POST"])
+@login_required
+def settings():
+    db = g.db
+    uid = current_uid()
+
+    if request.method == "POST":
+        provider = request.form.get("provider")
+        api_key = request.form.get("api_key", "").strip()
+        if provider not in SYNC_PROVIDERS:
+            flash("Fournisseur invalide.", "error")
+            return redirect(url_for("settings"))
+        if not api_key:
+            flash("Cle API requise.", "error")
+            return redirect(url_for("settings"))
+
+        encrypted = crypto.encrypt(api_key)
+        db.execute("""
+            INSERT INTO api_credentials (user_id, provider, encrypted_key, label, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (user_id, provider) DO UPDATE
+                SET encrypted_key = EXCLUDED.encrypted_key, label = EXCLUDED.label
+        """, (uid, provider, encrypted, crypto.mask(api_key), now()))
+        db.commit()
+        flash(f"Cle {provider} enregistree.", "success")
+        return redirect(url_for("settings"))
+
+    creds = db.execute(
+        "SELECT * FROM api_credentials WHERE user_id = ? ORDER BY provider", (uid,)
+    ).fetchall()
+    all_clients = db.execute(
+        "SELECT * FROM clients WHERE user_id = ? ORDER BY name", (uid,)
+    ).fetchall()
+    links = db.execute("""
+        SELECT l.*, c.name AS client_name FROM client_provider_links l
+        JOIN clients c ON c.id = l.client_id
+        WHERE c.user_id = ?
+        ORDER BY c.name
+    """, (uid,)).fetchall()
+
+    return render_template(
+        "settings.html", creds=creds, clients=all_clients, links=links,
+        sync_providers=SYNC_PROVIDERS,
+    )
+
+
+@app.route("/settings/delete/<provider>", methods=["POST"])
+@login_required
+def settings_delete(provider):
+    db = g.db
+    db.execute(
+        "DELETE FROM api_credentials WHERE user_id = ? AND provider = ?",
+        (current_uid(), provider),
+    )
+    db.commit()
+    flash("Cle supprimee.", "success")
+    return redirect(url_for("settings"))
+
+
+@app.route("/usage/sync", methods=["POST"])
+@login_required
+def usage_sync():
+    db = g.db
+    uid = current_uid()
+
+    creds = db.execute("SELECT * FROM api_credentials WHERE user_id = ?", (uid,)).fetchall()
+    if not creds:
+        flash("Ajoute d'abord une cle Admin API dans Parametres > Connexions API.", "error")
+        return redirect(url_for("settings"))
+
+    links = db.execute("""
+        SELECT l.provider, l.external_id, l.client_id FROM client_provider_links l
+        JOIN clients c ON c.id = l.client_id WHERE c.user_id = ?
+    """, (uid,)).fetchall()
+    link_map = {}
+    for link in links:
+        link_map.setdefault(link["provider"], {})[link["external_id"]] = link["client_id"]
+
+    inserted = 0
+    errors = []
+
+    for cred in creds:
+        provider = cred["provider"]
+        fetcher = FETCHERS.get(provider)
+        if not fetcher:
+            continue
+
+        api_key = crypto.decrypt(cred["encrypted_key"])
+        if not api_key:
+            errors.append(f"{provider} : cle illisible, merci de la ressaisir dans Parametres.")
+            continue
+
+        try:
+            rows = fetcher(api_key)
+        except ProviderSyncError as e:
+            errors.append(f"{provider} : {e}")
+            db.execute(
+                "UPDATE api_credentials SET last_sync_error = ? WHERE id = ?",
+                (str(e), cred["id"]),
+            )
+            continue
+        except Exception as e:
+            errors.append(f"{provider} : echec de connexion ({e}).")
+            continue
+
+        provider_links = link_map.get(provider, {})
+        for row in rows:
+            client_id = provider_links.get(row["external_id"])
+            if not client_id:
+                continue  # cout d'un project/workspace non rattache a un client : ignore
+            project_id = get_or_create_sync_project(db, client_id)
+            sync_key = f"{provider}:{row['external_id']}:{row['entry_date']}"
+            db.execute("""
+                INSERT INTO usage_entries
+                    (project_id, entry_date, provider, model, description, cost_usd, created_at, sync_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (sync_key) WHERE sync_key IS NOT NULL
+                DO UPDATE SET cost_usd = EXCLUDED.cost_usd
+            """, (
+                project_id, row["entry_date"], provider.capitalize(), "(agrege)",
+                "Synchronise automatiquement depuis l'API", row["amount_usd"], now(), sync_key,
+            ))
+            inserted += 1
+
+        db.execute(
+            "UPDATE api_credentials SET last_synced_at = ?, last_sync_error = NULL WHERE id = ?",
+            (now(), cred["id"]),
+        )
+
+    db.commit()
+
+    if errors:
+        flash(" / ".join(errors), "error")
+    if inserted:
+        flash(f"{inserted} ligne(s) d'usage synchronisee(s) depuis l'API.", "success")
+    elif not errors:
+        flash(
+            "Synchronisation effectuee, mais aucun cout n'a pu etre rattache a un client. "
+            "Verifie les liaisons project/workspace dans la fiche de chaque client.",
+            "error",
+        )
+
+    return redirect(url_for("usage"))
 
 
 if __name__ == "__main__":

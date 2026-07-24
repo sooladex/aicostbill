@@ -92,16 +92,47 @@ CREATE TABLE IF NOT EXISTS usage_entries (
     invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL
 );
+
+-- Cle Admin API (OpenAI / Anthropic) de l'agence, une par fournisseur.
+-- La cle elle-meme n'est jamais stockee en clair (voir crypto.py).
+CREATE TABLE IF NOT EXISTS api_credentials (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    encrypted_key TEXT NOT NULL,
+    label TEXT,
+    last_synced_at TEXT,
+    last_sync_error TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(user_id, provider)
+);
+
+-- Association entre un client de l'agence et son "project" OpenAI /
+-- "workspace" Anthropic cote fournisseur, pour attribuer automatiquement
+-- les couts recuperes via l'API au bon client.
+CREATE TABLE IF NOT EXISTS client_provider_links (
+    id SERIAL PRIMARY KEY,
+    client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    external_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(client_id, provider)
+);
 """
 
 
 # Migration : les deploiements d'avant le multi-compte ont une table clients
 # sans user_id. On l'ajoute si besoin et on rattache les clients orphelins
 # au premier compte existant, sans rien supprimer.
+# On ajoute aussi sync_key sur usage_entries pour la synchronisation
+# automatique (idempotence : une ligne par jour/fournisseur/projet externe).
 MIGRATION = """
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
 UPDATE clients SET user_id = (SELECT id FROM users ORDER BY id LIMIT 1)
 WHERE user_id IS NULL AND EXISTS (SELECT 1 FROM users);
+
+ALTER TABLE usage_entries ADD COLUMN IF NOT EXISTS sync_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS usage_entries_sync_key_idx ON usage_entries(sync_key) WHERE sync_key IS NOT NULL;
 """
 
 
