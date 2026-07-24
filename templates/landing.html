@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AICostBill — Facturez vos coûts d'API IA, avec marge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+    .hero-glow {
+      background: radial-gradient(600px 300px at 50% 0%, rgba(79,70,229,0.10), rgba(79,70,229,0) 70%);
+    }
+    .card-premium {
+      transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+    }
+    .card-premium:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px -12px rgba(17,24,39,0.12);
+      border-color: rgba(79,70,229,0.25);
+    }
+    .icon-square {
+      background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    }
+    .btn-shine {
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-shine::after {
+      content: "";
+      position: absolute;
+      top: 0; left: -75%;
+      width: 50%; height: 100%;
+      background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 100%);
+      transform: skewX(-20deg);
+      transition: left .6s ease;
+    }
+    .btn-shine:hover::after { left: 130%; }
+  </style>
+</head>
+<body class="bg-white text-gray-900">
+
+  <!-- Nav -->
+  <header class="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gray-900 flex items-center justify-center">
+          <span class="text-white text-sm font-bold">A</span>
+        </div>
+        <span class="font-semibold text-[15px] tracking-tight">AICostBill</span>
+      </div>
+      <nav class="hidden md:flex items-center gap-8 text-sm text-gray-500">
+        <a href="#produits" class="hover:text-gray-900 transition-colors">Fonctionnalités</a>
+        <a href="#comment" class="hover:text-gray-900 transition-colors">Comment ça marche</a>
+        <a href="#tarif" class="hover:text-gray-900 transition-colors">Tarifs</a>
+      </nav>
+      <div class="flex items-center gap-3">
+        <a href="{{ url_for('login') }}" class="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">Se connecter</a>
+        <a href="{{ url_for('login') }}"
+           class="btn-shine text-sm font-medium bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg transition-colors">
+          Essayer la démo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero-glow">
+    <div class="max-w-4xl mx-auto px-6 pt-24 pb-20 text-center">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 text-xs font-medium text-gray-500 mb-6">
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+        Pensé pour les agences qui revendent de l'IA
+      </div>
+      <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.05] text-gray-900">
+        Facturez vos coûts d'API IA.<br class="hidden sm:block">
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">Gardez votre marge.</span>
+      </h1>
+      <p class="mt-6 text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
+        OpenAI, Anthropic et les autres facturent au token. Vos clients, eux, veulent une facture claire.
+        AICostBill fait le pont : suivi d'usage par client, marge automatique, facture PDF en un clic.
+      </p>
+      <div class="mt-10 flex items-center justify-center gap-4">
+        <a href="{{ url_for('login') }}"
+           class="btn-shine bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold px-6 py-3 rounded-xl transition-colors shadow-lg shadow-gray-900/10">
+          Essayer la démo gratuite
+        </a>
+        <a href="#produits"
+           class="text-sm font-semibold text-gray-700 hover:text-gray-900 px-6 py-3 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+          Voir les fonctionnalités
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Grille produits -->
+  <section id="produits" class="max-w-6xl mx-auto px-6 py-20">
+    <div class="text-center mb-14">
+      <p class="text-xs font-semibold uppercase tracking-widest text-indigo-600 mb-3">Fonctionnalités</p>
+      <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">Tout ce qu'il faut, rien de superflu</h2>
+      <p class="mt-3 text-gray-500 max-w-xl mx-auto">Un outil pensé pour les agences, pas pour les data teams.</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+      <div class="card-premium bg-white border border-gray-100 rounded-2xl p-7">
+        <div class="icon-square w-11 h-11 rounded-xl flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3v-6m-3 6v-9m-2 9h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v11a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-gray-900 mb-2">Suivi d'usage par client</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">Chaque appel OpenAI, Anthropic ou autre est rattaché à un client et un projet, en temps réel.</p>
+      </div>
+
+      <div class="card-premium bg-white border border-gray-100 rounded-2xl p-7">
+        <div class="icon-square w-11 h-11 rounded-xl flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 10v2"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-gray-900 mb-2">Marge automatique</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">Définis une marge par client, le montant à facturer se calcule tout seul. Plus de tableur.</p>
+      </div>
+
+      <div class="card-premium bg-white border border-gray-100 rounded-2xl p-7">
+        <div class="icon-square w-11 h-11 rounded-xl flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-gray-900 mb-2">Facture PDF en un clic</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">Sélectionne un client et une période, la facture détaillée se génère, prête à envoyer.</p>
+      </div>
+
+      <div class="card-premium bg-white border border-gray-100 rounded-2xl p-7">
+        <div class="icon-square w-11 h-11 rounded-xl flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 8h16"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-gray-900 mb-2">Import CSV en masse</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">Déjà des exports de coûts ? Importe des centaines de lignes en une seule fois.</p>
+      </div>
+
+      <div class="card-premium bg-white border border-gray-100 rounded-2xl p-7">
+        <div class="icon-square w-11 h-11 rounded-xl flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-8.13a4 4 0 11-4 4 4 4 0 014-4zm6 3a4 4 0 11-4-4"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-gray-900 mb-2">Multi-clients illimité</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">Autant de clients et de projets que nécessaire, chacun avec sa propre marge.</p>
+      </div>
+
+      <div class="card-premium bg-white border border-gray-100 rounded-2xl p-7">
+        <div class="icon-square w-11 h-11 rounded-xl flex items-center justify-center mb-5">
+          <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+        </div>
+        <h3 class="font-semibold text-gray-900 mb-2">Tableau de bord clair</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">Coût total, montant facturé, marge réalisée et reste à facturer, en un coup d'œil.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Comment ça marche -->
+  <section id="comment" class="bg-gray-50 border-y border-gray-100">
+    <div class="max-w-5xl mx-auto px-6 py-20">
+      <div class="text-center mb-14">
+        <p class="text-xs font-semibold uppercase tracking-widest text-indigo-600 mb-3">Le principe</p>
+        <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">Trois étapes, pas plus</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+        <div class="text-center">
+          <div class="w-10 h-10 mx-auto rounded-full bg-gray-900 text-white flex items-center justify-center font-semibold mb-4">1</div>
+          <h3 class="font-semibold text-gray-900 mb-2">Enregistre l'usage</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Manuellement ou par import CSV, à chaque appel d'API facturé par ton fournisseur.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-10 h-10 mx-auto rounded-full bg-gray-900 text-white flex items-center justify-center font-semibold mb-4">2</div>
+          <h3 class="font-semibold text-gray-900 mb-2">Fixe ta marge</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Une marge par défaut, par client, modifiable à tout moment.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-10 h-10 mx-auto rounded-full bg-gray-900 text-white flex items-center justify-center font-semibold mb-4">3</div>
+          <h3 class="font-semibold text-gray-900 mb-2">Génère la facture</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">Choisis une période, le PDF détaillé part directement chez ton client.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tarif -->
+  <section id="tarif" class="max-w-3xl mx-auto px-6 py-20 text-center">
+    <p class="text-xs font-semibold uppercase tracking-widest text-indigo-600 mb-3">Tarif</p>
+    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 mb-10">Simple, sans surprise</h2>
+    <div class="card-premium inline-block bg-white border border-gray-200 rounded-2xl p-10 shadow-sm">
+      <p class="text-sm text-gray-500 mb-2">Pour une agence, tous clients confondus</p>
+      <p class="text-5xl font-extrabold text-gray-900 mb-1">19€<span class="text-lg font-medium text-gray-400">/mois</span></p>
+      <p class="text-sm text-gray-500 mb-8">Clients, projets et factures illimités</p>
+      <a href="{{ url_for('login') }}"
+         class="btn-shine block bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold px-6 py-3 rounded-xl transition-colors">
+        Essayer la démo gratuite
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-100">
+    <div class="max-w-6xl mx-auto px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded-md bg-gray-900 flex items-center justify-center">
+          <span class="text-white text-xs font-bold">A</span>
+        </div>
+        <span class="text-sm font-medium text-gray-600">AICostBill</span>
+      </div>
+      <p class="text-xs text-gray-400">© 2026 AICostBill. Prototype de validation.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
