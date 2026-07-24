@@ -91,9 +91,18 @@ def logout():
     return redirect(url_for("login"))
 
 
-# ---------- dashboard ----------
+# ---------- landing page ----------
 
 @app.route("/")
+def landing():
+    if session.get("user_id"):
+        return redirect(url_for("dashboard"))
+    return render_template("landing.html")
+
+
+# ---------- dashboard ----------
+
+@app.route("/dashboard")
 @login_required
 def dashboard():
     db = g.db
