@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} - AICostBill{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <a href="{{ url_for('clients') }}" class="text-sm text-gray-400 hover:text-gray-600">&larr; Clients</a>
+  <h1 class="text-2xl font-semibold mt-1">{{ client.name }}</h1>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Cout total</p>
+    <p class="text-xl font-semibold">{{ '%.2f'|format(total_cost) }} $</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Non facture</p>
+    <p class="text-xl font-semibold text-amber-600">{{ '%.2f'|format(uninvoiced_cost) }} $</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <form method="post" class="flex items-end gap-2">
+      <input type="hidden" name="form_name" value="update_markup">
+      <div class="flex-1">
+        <label class="block text-xs text-gray-500 mb-1">Marge par defaut (%)</label>
+        <input name="default_markup_pct" type="number" step="1" value="{{ client.default_markup_pct|int }}"
+               class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm">
+      </div>
+      <button type="submit" class="bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg">OK</button>
+    </form>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+  <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Projets</h2>
+    {% if projects %}
+    <ul class="space-y-2 mb-4">
+      {% for p in projects %}
+      <li class="text-sm border-b border-gray-100 pb-2">{{ p.name }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-gray-400 mb-4">Aucun projet pour ce client.</p>
+    {% endif %}
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-fit">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Ajouter un projet</h2>
+    <form method="post" class="space-y-3">
+      <input type="hidden" name="form_name" value="new_project">
+      <input name="project_name" required placeholder="ex: Chatbot support"
+             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-lg transition">Ajouter</button>
+    </form>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Derniers usages</h2>
+    {% if entries %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-400 text-xs uppercase">
+          <th class="pb-2">Date</th>
+          <th class="pb-2">Projet</th>
+          <th class="pb-2 text-right">Cout</th>
+          <th class="pb-2 text-right">Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr class="border-t border-gray-100">
+          <td class="py-2 whitespace-nowrap">{{ e.entry_date }}</td>
+          <td class="py-2">{{ e.project_name }}</td>
+          <td class="py-2 text-right">{{ '%.2f'|format(e.cost_usd) }} $</td>
+          <td class="py-2 text-right">
+            {% if e.invoice_id %}
+              <span class="text-green-600 text-xs">facture</span>
+            {% else %}
+              <span class="text-amber-600 text-xs">en attente</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-gray-400">Aucun usage enregistre pour ce client.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Factures</h2>
+    {% if invoices %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-400 text-xs uppercase">
+          <th class="pb-2">N°</th>
+          <th class="pb-2">Periode</th>
+          <th class="pb-2 text-right">Montant</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr class="border-t border-gray-100">
+          <td class="py-2"><a href="{{ url_for('invoice_detail', invoice_id=inv.id) }}" class="text-indigo-600 hover:underline">INV-{{ '%05d'|format(inv.id) }}</a></td>
+          <td class="py-2">{{ inv.period_start }} &rarr; {{ inv.period_end }}</td>
+          <td class="py-2 text-right">{{ '%.2f'|format(inv.total_billed) }} $</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-gray-400">Aucune facture pour ce client. <a href="{{ url_for('invoices') }}" class="text-indigo-600 hover:underline">Generer une facture</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

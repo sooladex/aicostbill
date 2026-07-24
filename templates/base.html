@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AICostBill{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+<div class="flex min-h-screen">
+  <aside class="w-60 bg-gray-900 text-gray-100 flex flex-col shrink-0">
+    <div class="px-5 py-5 text-lg font-semibold border-b border-gray-800">
+      AICostBill
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-1 text-sm">
+      <a href="{{ url_for('dashboard') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint == 'dashboard' }}">Tableau de bord</a>
+      <a href="{{ url_for('clients') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint in ['clients','client_detail'] }}">Clients</a>
+      <a href="{{ url_for('usage') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint == 'usage' }}">Usage IA</a>
+      <a href="{{ url_for('invoices') }}" class="block px-3 py-2 rounded-lg hover:bg-gray-800 {{ 'bg-gray-800' if request.endpoint in ['invoices','invoice_detail'] }}">Factures</a>
+    </nav>
+    <div class="px-3 py-4 border-t border-gray-800">
+      <a href="{{ url_for('logout') }}" class="block px-3 py-2 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white text-sm">Se deconnecter</a>
+    </div>
+  </aside>
+  <main class="flex-1 p-8 max-w-6xl mx-auto w-full">
+    {% include 'flash.html' %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord - AICostBill{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Tableau de bord</h1>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Cout API total</p>
+    <p class="text-2xl font-semibold">{{ '%.2f'|format(total_cost) }} $</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Total facture aux clients</p>
+    <p class="text-2xl font-semibold">{{ '%.2f'|format(total_billed) }} $</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Marge realisee</p>
+    <p class="text-2xl font-semibold text-green-600">{{ '%.2f'|format(margin) }} $</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Usage pas encore facture</p>
+    <p class="text-2xl font-semibold text-amber-600">{{ '%.2f'|format(uninvoiced_cost) }} $</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Par client</h2>
+    {% if per_client %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-400 text-xs uppercase">
+          <th class="pb-2">Client</th>
+          <th class="pb-2 text-right">Cout total</th>
+          <th class="pb-2 text-right">A facturer</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in per_client %}
+        <tr class="border-t border-gray-100">
+          <td class="py-2"><a href="{{ url_for('client_detail', client_id=c.id) }}" class="text-indigo-600 hover:underline">{{ c.name }}</a></td>
+          <td class="py-2 text-right">{{ '%.2f'|format(c.total_cost) }} $</td>
+          <td class="py-2 text-right {{ 'text-amber-600 font-medium' if c.uninvoiced_cost > 0 }}">{{ '%.2f'|format(c.uninvoiced_cost) }} $</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-gray-400">Aucun client pour le moment. <a href="{{ url_for('clients') }}" class="text-indigo-600 hover:underline">Ajoute ton premier client</a>.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Derniers usages enregistres</h2>
+    {% if recent_entries %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-400 text-xs uppercase">
+          <th class="pb-2">Date</th>
+          <th class="pb-2">Client / Projet</th>
+          <th class="pb-2 text-right">Cout</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in recent_entries %}
+        <tr class="border-t border-gray-100">
+          <td class="py-2 whitespace-nowrap">{{ e.entry_date }}</td>
+          <td class="py-2">{{ e.client_name }} / {{ e.project_name }}</td>
+          <td class="py-2 text-right">{{ '%.2f'|format(e.cost_usd) }} $</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-gray-400">Aucun usage enregistre. <a href="{{ url_for('usage') }}" class="text-indigo-600 hover:underline">Ajoute ta premiere entree</a>.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

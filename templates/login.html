@@ -1,0 +1,40 @@
+{% extends "base_auth.html" %}
+{% block title %}Connexion - AICostBill{% endblock %}
+{% block content %}
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+  <h1 class="text-xl font-semibold mb-1">AICostBill</h1>
+  <p class="text-sm text-gray-500 mb-6">
+    {% if has_user %}
+      Connecte-toi a ton espace agence.
+    {% else %}
+      Premier lancement : cree ton compte agence.
+    {% endif %}
+  </p>
+  <form method="post" class="space-y-4">
+    {% if not has_user %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Nom de l'agence</label>
+      <input name="agency_name" type="text" required
+             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+             placeholder="Mon agence IA">
+    </div>
+    {% endif %}
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <input name="email" type="email" required
+             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+             placeholder="toi@agence.com">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+      <input name="password" type="password" required
+             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+             placeholder="********">
+    </div>
+    <button type="submit"
+            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-lg transition">
+      {{ 'Creer mon compte' if not has_user else 'Se connecter' }}
+    </button>
+  </form>
+</div>
+{% endblock %}

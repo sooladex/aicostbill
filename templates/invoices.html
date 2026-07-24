@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Factures - AICostBill{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Factures</h1>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Historique</h2>
+    {% if invoices %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="text-left text-gray-400 text-xs uppercase">
+          <th class="pb-2">N°</th>
+          <th class="pb-2">Client</th>
+          <th class="pb-2">Periode</th>
+          <th class="pb-2 text-right">Cout</th>
+          <th class="pb-2 text-right">Facture</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr class="border-t border-gray-100">
+          <td class="py-2"><a href="{{ url_for('invoice_detail', invoice_id=inv.id) }}" class="text-indigo-600 hover:underline">INV-{{ '%05d'|format(inv.id) }}</a></td>
+          <td class="py-2">{{ inv.client_name }}</td>
+          <td class="py-2 whitespace-nowrap">{{ inv.period_start }} &rarr; {{ inv.period_end }}</td>
+          <td class="py-2 text-right">{{ '%.2f'|format(inv.subtotal_cost) }} $</td>
+          <td class="py-2 text-right font-medium">{{ '%.2f'|format(inv.total_billed) }} $</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-gray-400">Aucune facture generee.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 h-fit">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Generer une facture</h2>
+    <form method="post" class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Client</label>
+        <select name="client_id" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+          <option value="">-- choisir --</option>
+          {% for c in clients %}
+          <option value="{{ c.id }}">{{ c.name }} (marge {{ c.default_markup_pct|int }}%)</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Debut periode</label>
+          <input name="period_start" type="date" required class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Fin periode</label>
+          <input name="period_end" type="date" required value="{{ today }}" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Marge appliquee (%) — laisser vide pour utiliser la marge par defaut du client</label>
+        <input name="markup_pct" type="number" step="1" placeholder="ex: 30" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+      </div>
+      <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2 rounded-lg transition">Generer la facture</button>
+      <p class="text-xs text-gray-400">Reprend automatiquement tout l'usage non encore facture de ce client sur la periode choisie.</p>
+    </form>
+  </div>
+</div>
+{% endblock %}

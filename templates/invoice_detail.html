@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Facture INV-{{ '%05d'|format(invoice.id) }} - AICostBill{% endblock %}
+{% block content %}
+<div class="mb-6">
+  <a href="{{ url_for('invoices') }}" class="text-sm text-gray-400 hover:text-gray-600">&larr; Factures</a>
+  <div class="flex items-center justify-between mt-1">
+    <h1 class="text-2xl font-semibold">Facture INV-{{ '%05d'|format(invoice.id) }}</h1>
+    <a href="{{ url_for('invoice_pdf_download', invoice_id=invoice.id) }}"
+       class="bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+      Telecharger le PDF
+    </a>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Client</p>
+    <p class="text-lg font-semibold">{{ client.name }}</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Periode</p>
+    <p class="text-lg font-semibold">{{ invoice.period_start }} &rarr; {{ invoice.period_end }}</p>
+  </div>
+  <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+    <p class="text-xs text-gray-500 mb-1">Marge appliquee</p>
+    <p class="text-lg font-semibold">{{ invoice.markup_pct|int }}%</p>
+  </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+  <h2 class="text-sm font-semibold text-gray-700 mb-4">Detail de l'usage facture</h2>
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-gray-400 text-xs uppercase">
+        <th class="pb-2">Date</th>
+        <th class="pb-2">Projet</th>
+        <th class="pb-2">Fournisseur</th>
+        <th class="pb-2">Modele</th>
+        <th class="pb-2">Description</th>
+        <th class="pb-2 text-right">Cout</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in items %}
+      <tr class="border-t border-gray-100">
+        <td class="py-2 whitespace-nowrap">{{ it.entry_date }}</td>
+        <td class="py-2">{{ it.project_name }}</td>
+        <td class="py-2">{{ it.provider }}</td>
+        <td class="py-2 text-gray-500">{{ it.model or '-' }}</td>
+        <td class="py-2 text-gray-500">{{ it.description or '-' }}</td>
+        <td class="py-2 text-right">{{ '%.2f'|format(it.cost_usd) }} $</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 max-w-md ml-auto">
+  <div class="flex justify-between text-sm py-1">
+    <span class="text-gray-500">Cout API total</span>
+    <span>{{ '%.2f'|format(invoice.subtotal_cost) }} $</span>
+  </div>
+  <div class="flex justify-between text-sm py-1">
+    <span class="text-gray-500">Marge ({{ invoice.markup_pct|int }}%)</span>
+    <span class="text-green-600">{{ '%.2f'|format(invoice.total_billed - invoice.subtotal_cost) }} $</span>
+  </div>
+  <div class="flex justify-between text-base font-semibold border-t border-gray-100 mt-2 pt-2">
+    <span>Total facture</span>
+    <span>{{ '%.2f'|format(invoice.total_billed) }} $</span>
+  </div>
+</div>
+{% endblock %}
